@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Захищений Профіль</title>
+    <style>
+        body { background: #141414; color: white; font-family: Arial, sans-serif; margin: 0; padding: 0; }
+        .profile-banner { width: 100%; height: 220px; background-size: cover; background-position: center; position: relative; border-bottom: 4px solid #e67e22; }
+        .profile-container { max-width: 800px; margin: -60px auto 0 auto; padding: 20px; position: relative; }
+        .profile-header-main { display: flex; align-items: flex-end; gap: 20px; margin-bottom: 30px; }
+        .profile-avatar { width: 130px; height: 130px; border-radius: 50%; border: 4px solid #141414; background: #222; object-fit: cover; }
+        .user-info h1 { margin: 0 0 5px 0; font-size: 32px; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+        .balance-tag { color: #f1c40f; font-weight: bold; font-size: 18px; margin-bottom: 10px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn-change { background: #e67e22; color: white; }
+        .btn-logout { background: #c0392b; color: white; margin-left: auto; }
+        .section-title { border-bottom: 2px solid #333; padding-bottom: 10px; margin-top: 40px; }
+        .inventory-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; margin-top: 20px; }
+        .inventory-item { background: #222; padding: 10px; border-radius: 10px; text-align: center; border: 1px solid #333; cursor: pointer; transition: 0.2s; }
+        .inventory-item:hover { border-color: #e67e22; transform: translateY(-3px); }
+        .inventory-item img { width: 100%; height: 80px; object-fit: cover; border-radius: 5px; margin-bottom: 5px; }
+        .inventory-item span { font-size: 13px; color: #ccc; }
+        
+        /* Модалка магазину */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 100; }
+        .modal.show { display: flex; }
+        .modal-content { background: #222; padding: 25px; border-radius: 15px; width: 90%; max-width: 450px; text-align: center; border: 1px solid #444; }
+        .avatar-shop-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 20px; }
+        .avatar-item { background: #333; padding: 15px; border-radius: 10px; cursor: pointer; border: 2px solid transparent; }
+        .avatar-item:hover { border-color: #e67e22; }
+        .avatar-item img { width: 70px; height: 70px; border-radius: 50%; }
+        .close-shop { margin-top: 20px; background: #555; color: white; width: 100%; }
+    </style>
+</head>
+<body>
+
+<div class="profile-banner" id="profile-banner"></div>
+
+<div class="profile-container">
+    <a href="index.html" style="display: inline-block; background: rgba(0,0,0,0.5); color: #e67e22; text-decoration: none; padding: 10px 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e67e22; font-weight: bold; transition: 0.3s;">
+        ← На головну сторінку
+    </a>
+    <div class="profile-header-main">
+        <img src="" class="profile-avatar" id="profile-avatar">
+        <div class="user-info">
+            <h1 id="profile-username">Завантаження...</h1>
+            <div class="balance-tag">💰 Серверний Баланс: <span id="profile-balance">0</span> зірок</div>
+            <button class="btn btn-change" onclick="openAvatarShop()">Змінити аватар</button>
+        </div>
+        <button class="btn btn-logout" onclick="logout()">Вийти</button>
+    </div>
+
+    <h3 class="section-title">Мій Інвентар (Предмети на сервері)</h3>
+    <div class="inventory-grid" id="inventory-grid"></div>
+</div>
+
+<div class="modal" id="avatar-modal">
+    <div class="modal-content">
+        <h3>Оберіть новий аватар</h3>
+        <div class="avatar-shop-grid">
+            <div class="avatar-item" onclick="updateAvatar('https://cdn-icons-png.flaticon.com/512/1144/1144760.png')">
+                <img src="https://cdn-icons-png.flaticon.com/512/1144/1144760.png">
+                <p style="margin:5px 0 0 0; font-size:12px;">Стандартний</p>
+            </div>
+            <div class="avatar-item" onclick="updateAvatar('https://cdn-icons-png.flaticon.com/512/3135/3135715.png')">
+                <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png">
+                <p style="margin:5px 0 0 0; font-size:12px;">Кібер-Користувач</p>
+            </div>
+        </div>
+        <button class="btn close-shop" onclick="closeAvatarShop()">Закрити</button>
+    </div>
+</div>
+
+<script>
+    // Перевіряємо, чи юзер увійшов (чи є токен імені в sessionStorage)
+    const currentUser = sessionStorage.getItem('secureUser');
+    if (!currentUser) {
+        window.location.href = 'auth.html'; // Якщо ні — виганяємо
+    }
+
+    // Завантажуємо дані профілю СЕРВЕРА при відкритті сторінки
+    async function loadProfile() {
+        try {
+            const response = await fetch(`/api/profile?username=${currentUser}`);
+            const data = await response.json();
+
+            if (data.success) {
+                const p = data.profile;
+                document.getElementById('profile-username').innerText = currentUser;
+                document.getElementById('profile-balance').innerText = p.balance.toLocaleString();
+                document.getElementById('profile-avatar').src = p.avatar;
+                
+                if(p.banner.startsWith('linear-gradient')) {
+                    document.getElementById('profile-banner').style.background = p.banner;
+                } else {
+                    document.getElementById('profile-banner').style.backgroundImage = `url('${p.banner}')`;
+                }
+
+                // Виводимо предмети з інвентаря, який лежить на сервері
+                const invGrid = document.getElementById('inventory-grid');
+                invGrid.innerHTML = p.inventory.map(item => `
+                    <div class="inventory-item" onclick="updateBanner('${item.url}')">
+                        <img src="${item.url}">
+                        <span>${item.name}</span>
+                    </div>
+                `).join('');
+            }
+        } catch (err) {
+            alert("Помилка завантаження профілю з сервера.");
+        }
+    }
+
+    // Зміна аватара (відправка на сервер)
+    async function updateAvatar(url) {
+        const response = await fetch('/api/profile/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: currentUser, avatar: url })
+        });
+        const data = await response.json();
+        if(data.success) {
+            document.getElementById('profile-avatar').src = url;
+            closeAvatarShop();
+        }
+    }
+
+    // Зміна шпалер / баннера профілю (відправка на сервер)
+    async function updateBanner(url) {
+        const response = await fetch('/api/profile/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: currentUser, banner: url })
+        });
+        const data = await response.json();
+        if(data.success) {
+            document.getElementById('profile-banner').style.background = `url('${url}')`;
+            document.getElementById('profile-banner').style.backgroundSize = `cover`;
+            alert(data.message);
+        }
+    }
+
+    function openAvatarShop() { document.getElementById('avatar-modal').classList.add('show'); }
+    function closeAvatarShop() { document.getElementById('avatar-modal').classList.remove('show'); }
+    
+    function logout() {
+        sessionStorage.removeItem('secureUser'); // стираємо сесію вкладки
+        window.location.href = 'auth.html';
+    }
+
+    document.addEventListener('DOMContentLoaded', loadProfile);
+</script>
+</body>
+</html>
